@@ -96,7 +96,7 @@ class EncoderLayer(nn.Module):
     def forward(self, x, mask):
         # 注意这个匿名函数：这要追溯到SublayerConnection中的残差连接中
         x = self.sublayers[0](x, lambda x: self.self_attn(x, x, x, mask))
-        return self.sublayer[1](x, self.feed_forward)
+        return self.sublayers[1](x, self.feed_forward)
 
 
 class Decoder(nn.Module):
@@ -114,7 +114,7 @@ class Decoder(nn.Module):
 
 class DecoderLayer(nn.Module):
 
-    def __init__(self, self_attn, src_attn, feed_forward, dropout, size):
+    def __init__(self, size, self_attn, src_attn, feed_forward, dropout):
         super(DecoderLayer, self).__init__()
         self.self_attn = self_attn
         self.src_attn = src_attn
@@ -198,8 +198,8 @@ class PositionwiseFeedForward(nn.Module):
     # 作为Encoder和Decoder子层的FFN
     def __init__(self, d_model, d_ff, dropout=0.1):
         super(PositionwiseFeedForward, self).__init__()
-        self.w1 = nn.Linear(d_model, d_ff)
-        self.w2 = nn.Linear(d_ff, d_model)
+        self.w_1 = nn.Linear(d_model, d_ff)
+        self.w_2 = nn.Linear(d_ff, d_model)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -245,9 +245,9 @@ def make_model(
         src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0.1
 ):
     # 注意这里没有mask的事
-    c = copy.deepcopy()
+    c = copy.deepcopy
     attn = MultiHeadedAttention(h, d_model)
-    ff = PositionwiseFeedForward(d_model, dropout)
+    ff = PositionwiseFeedForward(d_model, d_ff, dropout)
     position = PositionalEncoding(d_model, dropout)
     model = EncoderDecoder(
         Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N),
