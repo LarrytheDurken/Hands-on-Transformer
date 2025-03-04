@@ -1,7 +1,7 @@
 # Hands-on-Transformer
 本人的Transformer练手项目。
 
-# 注意点
+# Tips
 
 ## 搭建逻辑
 + 整体到局部
@@ -13,6 +13,7 @@
     + src_mask和tgt_mask的作用分别是什么
 + 超参数的意义
     +  src_vocab, tgt_vocab, N, d_model, d_ff, h, dropout
++ qkv的具体含义
 
 ## 张量的shape变化
 + src，tgt及embedding后的shape

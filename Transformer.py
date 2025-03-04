@@ -141,18 +141,22 @@ def subsequent_mask(size):
 def attention(query, key, value, mask=None, dropout=None):
     # attention只是一种矩阵运算，不需要更新参数
 
+    # 感悟：
+    # 实际上v是最终我们想要的东西，所以最终输出的shape是与v一样的
+    # 而q是为了提取出v中更关键的因素，指导最终的结果，所以生成的叫“注意力分数”并且score与q的shape是一样的
+
     # 这里qkv的shape一般为(batch_size, h, seq_len, d_k)。注意，self_attn中qkv的seq_len都为原序列的序列长度，src_attn中q的seq_len为目标序列kv的seq_len为源序列的
     # 即使shape存在区别，但最后两维也一定为(seq_len, d_k)，因为注意力机制的目的就是检测序列之间的关系
     d_k = query.size(-1)
     # scores的shape一般(batch_size, h, seq_len, seq_len)，表示每个token对其他token的注意力分数
-    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)  # shape以q的sqe_len为基准
+    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)  # score的shape以q的seq_len为基准
     if mask is not None:
         scores = scores.masked_fill(mask == 0, -1e9)
     p_attn = scores.softmax(dim=-1)  # softmax后的注意力分布
     if dropout is not None:
         p_attn = dropout(p_attn)
     # 输出一个shape为(batch_size, h, seq_len, d_k)的向量和注意力分数
-    return torch.matmul(p_attn, value), p_attn
+    return torch.matmul(p_attn, value), p_attn  # 最终输出的shape以v的seq_len为基准
 
 
 class MultiHeadedAttention(nn.Module):
