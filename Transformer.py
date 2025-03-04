@@ -16,7 +16,7 @@ class EncoderDecoder(nn.Module):
         self.generator = generator
 
     def forward(self, src, tgt, src_mask, tgt_mask):
-        # 1️⃣ src和tgt的shape: (batch_size, seq_len)，这两个一般是词ID（整数序列，代表词表中的索引），seq_len是序列的最大长度
+        # 1️⃣ src和tgt的shape: (batch_size, seq_len)，这两个一般是词ID（整数序列，代表词表中的索引），seq_len是这段序列的最大长度
         # 2️⃣ src和tgt经过embedding后变为词向量的形式，故shape变为(batch_size, seq_len, d_model)
         # 3️⃣ 最后经过全连接层(Generator)后shape一般为(batch_size, seq_len, vocab), 因此要对最后一层（-1）进行softmax
 
@@ -141,16 +141,17 @@ def subsequent_mask(size):
 def attention(query, key, value, mask=None, dropout=None):
     # attention只是一种矩阵运算，不需要更新参数
 
-    # qkv的shape一般为(batch_size, h, seq_len, d_k)
+    # 这里qkv的shape一般为(batch_size, h, seq_len, d_k)。注意，self_attn中qkv的seq_len都为原序列的序列长度，src_attn中q的seq_len为目标序列kv的seq_len为源序列的
     # 即使shape存在区别，但最后两维也一定为(seq_len, d_k)，因为注意力机制的目的就是检测序列之间的关系
     d_k = query.size(-1)
     # scores的shape一般(batch_size, h, seq_len, seq_len)，表示每个token对其他token的注意力分数
-    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)  # shape以q的sqe_len为基准
     if mask is not None:
         scores = scores.masked_fill(mask == 0, -1e9)
     p_attn = scores.softmax(dim=-1)  # softmax后的注意力分布
     if dropout is not None:
         p_attn = dropout(p_attn)
+    # 输出一个shape为(batch_size, h, seq_len, d_k)的向量和注意力分数
     return torch.matmul(p_attn, value), p_attn
 
 
@@ -164,12 +165,13 @@ class MultiHeadedAttention(nn.Module):
         self.attn = None
         self.dropout = nn.Dropout(p=dropout)
 
-    def forward(self, query, key, value, mask=None):  # query，key，value哪来的？？？？？？？？？？？？？？？？？？？？？？？？？
+    def forward(self, query, key, value, mask=None):
         if mask is not None:
+            # mask的shape本来为(batch_size, 1, d_k)，由于多头注意力比原本的src和tgt向量多了一个head的维度，因此扩展一维以便运用广播
             mask = mask.unsqueeze(1)  # 为什么？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？
         nbatches = query.size(0)
 
-        # qkv的shape: (batch_size, seq_len, d_model)
+        # qkv的shape: (batch_size, max_len, d_model)
         query, key, value = [
             # 这里不能写成view(nbatches, self.h, -1, self.d_k)：
             # 1.view的作用机理：按照内存存储顺序（行优先）对张量重新塑形
@@ -223,18 +225,24 @@ class Embeddings(nn.Module):
 class PositionalEncoding(nn.Module):
 
     def __init__(self, d_model, dropout, max_len=5000):
+        # max_len是模型所能容纳的最大序列数
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
 
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len).unsqueeze(1)  # 为了下边可以利用广播机制，扩展一个维度  
+        pe = torch.zeros(max_len, d_model)  # pe的shape: (max_len, d_model)
+        position = torch.arange(0, max_len)  # position的shape: (max_len)
+        position = position.unsqueeze(1)  # 为了下边可以利用广播机制，扩展一个维度，shape变为(max_len, 1) 
         div_term = torch.exp(
-            torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model)  # 广播
+            torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model) 
         )
-        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 0::2] = torch.sin(position * div_term)  # 呼应上文广播
         pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0)  # 增加批次的维度
-        self.register_buffer("pe", pe)
+        pe = pe.unsqueeze(0)  # 增加批次的维度，为了方便广播，此时pe的shape为(1, max_len, d_model)
+        # 将pe注册在缓冲区，有两个好处：
+        # 1️⃣ 切换设备(cpu/gpu)回跟随模型转移
+        # 2️⃣ 保存/加载模型时不会丢失
+        # 3️⃣ 不参与梯度计算
+        self.register_buffer("pe", pe)  
 
     def forward(self, x):
         x = x + self.pe[:, : x.size(1)].requires_grad_(False)
