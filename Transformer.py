@@ -168,7 +168,7 @@ class MultiHeadedAttention(nn.Module):
     def forward(self, query, key, value, mask=None):
         if mask is not None:
             # mask的shape本来为(batch_size, 1, d_k)，由于多头注意力比原本的src和tgt向量多了一个head的维度，因此扩展一维以便运用广播
-            mask = mask.unsqueeze(1)  # 为什么？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？
+            mask = mask.unsqueeze(1) 
         nbatches = query.size(0)
 
         # qkv的shape: (batch_size, max_len, d_model)
